@@ -15,7 +15,7 @@ in terms of the ensemble average.
 ## Files:
 
 - `classical_test`: testing the stochastic Magnus expansion-based schemes (Scheme I-IV) via the exact wavefunction trajectory method
-- `quantum_test`: testing the validity of the ansatz-based variational simulation of quantum dynamics for implemented using `Qiskit`
+- `quantum_test`: testing the validity of the ansatz-based variational simulation of quantum dynamics, implemented using `Qiskit`
 
 **Three different models are simulated to examine the performance of the algorithm:**
 - `test_TFIM.py`: the transverse field Ising model (TFIM) with damping
