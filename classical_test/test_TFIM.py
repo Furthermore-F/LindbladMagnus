@@ -12,7 +12,7 @@ step_num = 100
 T = 25
 tlist = np.linspace(0.0, T, step_num+1)
 traj_num = 1
-evo_method = {'period': 7, 
+evo_method = {'period': 42424, 
               'type': 'linear', 
               'nonlinear_corr': False,
               'comparison': False,
@@ -40,9 +40,9 @@ ax2.set_xlim([0,T])
 
 tlist_exact = np.linspace(0.0, T, step_num*100+1)
 result = mesolve(Qobj(H), Qobj(psi0), tlist_exact, [Qobj(op) for op in c_ops], [Qobj(op) for op in e_ops])
-# ax1.plot(tlist_exact, result.expect[0], label = 'Exact |00>')
-# ax1.plot(tlist_exact, result.expect[1], label = 'Exact |11>')
-# ax1.plot(tlist_exact, result.expect[2], label = 'Exact |01>')
+ax1.plot(tlist_exact, result.expect[0], label = 'Exact |00>')
+ax1.plot(tlist_exact, result.expect[1], label = 'Exact |11>')
+ax1.plot(tlist_exact, result.expect[2], label = 'Exact |01>')
 
 # Compare QSD results and Mesolve exact results
 result = mesolve(Qobj(H), Qobj(psi0), tlist, [Qobj(op) for op in c_ops], [Qobj(op) for op in e_ops])
@@ -60,7 +60,7 @@ else:
     order = evo_method['order']
     file_name = f'classical_test/TFIM/{order}order_{evo_method["type"]}_{traj_num}traj_{step_num}step_{evo_method["nonlinear_corr"]}_{evo_method["period"]}'
     initial = [psi0]*traj_num # initial wavefunction ensemble
-    _, e_list = qsdsolve(H, initial, tlist, c_ops, e_ops, evo_method)
+    e_list, _  = qsdsolve(H, initial, tlist, c_ops, e_ops, evo_method)
     for stat in range(len(e_ops)):
         ax1.plot(tlist, [e_list[i][stat] for i in range(len(tlist))], 
                     label = f'QSD {e_ops_name[stat]}, M{order}')
@@ -72,4 +72,3 @@ np.savez(f'{file_name}.npz', exact_result = result.expect, qsd_result = e_list)
 ax1.legend()
 ax2.legend()
 plt.savefig(f'{file_name}.png', dpi=600)
-plt.show()

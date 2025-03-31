@@ -141,15 +141,11 @@ def single_traj_evo(circ_info:dict, evo_info:dict, hamil_info:dict, random_seed:
 
         # Measure population
         job_result = simulator.run(circ_info['circuit']).result().get_statevector(circ_info['circuit'])
-        # circ_info['circuit'].draw("mpl", style="iqp")
-        # plt.show()
-        # print(job_result)
         job_result = partial_trace(job_result, [0])
         job_result = np.abs(np.asarray([job_result.expectation_value(op) for op in hamil_info['observation']]))
         if hamil_info['types'] == 'Linear':
             job_result = np.abs(job_result*(psi_norm**2))
         results.append(job_result)
-        print(job_result)
         del circ_info['circuit'].data[-1]
 
         # Runge-Kutta RK4 Method
@@ -166,7 +162,6 @@ def single_traj_evo(circ_info:dict, evo_info:dict, hamil_info:dict, random_seed:
                                for i, key in enumerate(circ_info['params'])}
         circ_info['circuit'] = circ_info['circuit'].assign_parameters(circ_info['params'])
         m, v, norm_grad, expect_L_2 = measure_M_V(circ_info, hamil_info, simulator)
-        # m = m + 1e-5*np.identity(circ_info['param_num'])
         k_2 = np.dot(np.linalg.pinv(m), v)
         delta_norm_2 = norm_grad * (delta_norm_1*evo_info['time_interval']/2 + psi_norm)
 
@@ -176,7 +171,6 @@ def single_traj_evo(circ_info:dict, evo_info:dict, hamil_info:dict, random_seed:
                                for i, key in enumerate(circ_info['params'])}
         circ_info['circuit'] = circ_info['circuit'].assign_parameters(circ_info['params'])
         m, v, norm_grad, expect_L_3 = measure_M_V(circ_info, hamil_info, simulator)
-        # m = m + 1e-5*np.identity(circ_info['param_num'])
         k_3 = np.dot(np.linalg.pinv(m), v)
         delta_norm_3 = norm_grad * (delta_norm_2*evo_info['time_interval']/2 + psi_norm)
 
@@ -186,7 +180,6 @@ def single_traj_evo(circ_info:dict, evo_info:dict, hamil_info:dict, random_seed:
                                for i, key in enumerate(circ_info['params'])}
         circ_info['circuit'] = circ_info['circuit'].assign_parameters(circ_info['params'])
         m, v, norm_grad, expect_L_4 = measure_M_V(circ_info, hamil_info, simulator)
-        # m = m + 1e-5*np.identity(circ_info['param_num'])
         k_4 = np.dot(np.linalg.pinv(m), v)
         delta_norm_4 = norm_grad * (delta_norm_3*evo_info['time_interval'] + psi_norm)
 

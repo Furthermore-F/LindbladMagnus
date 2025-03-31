@@ -92,11 +92,6 @@ def traj_evo(H:np.array, psi:np.array, dt:float, c_ops:list, evo_method:dict, ra
 
         psi_p = sp.sparse.linalg.expm_multiply(H_eff, psi)
 
-    np.set_printoptions(linewidth=1000,precision=2)
-    H_eff = H_eff/10
-    print(sp.sparse.linalg.expm(H_eff)-H_eff)
-    exit()
-
     if evo_method['type'] == 'nonlinear':
         psi_p = psi_p/np.linalg.norm(psi_p)
 
@@ -116,7 +111,7 @@ def traj_evo_comparison(H:np.array, psis:list, dt:float, c_ops:list, evo_method:
     Returns:
         The wave function of next step.
     """
-    # np.random.seed(rand_seed)
+    np.random.seed(rand_seed)
     p = 1000 # Approximation order
     k = len(c_ops) # Wiener increments number
     R = np.diag([1/(i+1) for i in range(p)])
@@ -245,7 +240,6 @@ def qsdsolve(H:np.array, initial:list, tlist:np.array, c_ops:list, e_ops:list, e
                 var.append(np.real(np.std(_temps)))
 
         e_list.append(expect)
-        print(expect)
         v_list.append(var)
         if i < len(tlist)-1:
         # add parallelization using joblib
