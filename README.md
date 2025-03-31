@@ -22,14 +22,6 @@ in terms of the ensemble average.
 - `test_FMO.py`: the Fenna-Matthews-Olson (FMO) complex dynamics
 - `test_RPM.py`: the radical pair model (RPM) for avian compass dynamics
 
-### Requirements:
+## References:
 
-### Usage:
-
-1. Open `query2model_main.py`;
-2. Modify the task query according to the directions of the comments;
-3. Modify the model generate query;
-4. Set the saved filename;
-5. Run.
-
-## References
+Jia-Cheng Huang, Hao-En Li, Yi-Cheng Wang, Guang-Ze Zhang, Jun Li, Han-Shi Hu, “Towards robust variational quantum simulation of Lindblad dynamics via stochastic Magnus expansion”, [arXiv:2503.22099](https://arxiv.org/abs/2503.22099)
