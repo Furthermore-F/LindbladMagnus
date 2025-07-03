@@ -84,7 +84,7 @@ else:
     order = evo_method['order']
     file_name = f'classical_test/RPM/{order}order_{evo_method["type"]}_{traj_num}traj_{step_num}step_{B_0}T_{theta_angle}d'
     initial = [_psi0]*(traj_num//2) + [_psi1]*(traj_num//2) # initial wavefunction ensemble
-    _, e_list = qsdsolve(H, initial, tlist, c_ops, e_ops, evo_method)
+    e_list, _  = qsdsolve(H, initial, tlist, c_ops, e_ops, evo_method)
     for stat in range(len(e_ops)):
         ax1.plot(tlist, [e_list[i][stat] for i in range(len(tlist))], 
                  label = f'QSD {e_ops_name[stat]}, M{order}')
@@ -96,4 +96,3 @@ np.savez(f'{file_name}.npz', exact_result = result.expect, qsd_result = e_list)
 ax1.legend()
 ax2.legend()
 plt.savefig(f'{file_name}.png', dpi=600)
-plt.show()
