@@ -36,13 +36,14 @@ def traj_evo(H:np.array, psi:np.array, dt:float, c_ops:list, evo_method:dict, ra
     aij = (zetas@R@etas.T-etas@R@zetas.T)/(2*np.pi)
     c0 = (np.sqrt(2*dt)/(8*np.pi**3))*np.sum([zetas[:,i]/((i+1)**3) for i in range(p)],axis=0) # Fourth order
 
-    c_expects = [0 for _ in c_ops]
+    c_expects = [0+0J for _ in c_ops]
     if evo_method['type'] == 'nonlinear':
         c_expects = [np.trace(np.outer(np.conj(psi), psi)@op) for op in c_ops]
 
     X_0 = -1J*H+sum([-0.5*(np.conj(op).T+op)@op+2*np.real(e_op)*op for op, e_op in zip(c_ops, c_expects)])
     H_eff = deepcopy(X_0*dt)
     if evo_method['order'] > 0:
+        # Stochastic Magnus expansion
         for i in range(k):
             H_eff += c_ops[i]*np.sqrt(dt)*xis[i]
             if evo_method['order'] > 1:
@@ -58,12 +59,13 @@ def traj_evo(H:np.array, psi:np.array, dt:float, c_ops:list, evo_method:dict, ra
                     if evo_method['order'] > 3:
                         _comm = X_0@_comm-_comm@X_0
                         H_eff += _comm*dt*dt*dt*c0[i]
+        psi_p = sp.sparse.linalg.expm_multiply(H_eff, psi)
     else:
+        # Euler-Maruyama method
+        H_eff = (-1J*H+sum([-0.5*(np.conj(op).T)@op+np.conj(e_op)*op for op, e_op in zip(c_ops, c_expects)]))*dt
         for i in range(k):
             H_eff += c_ops[i]*np.sqrt(dt)*xis[i]
-        H_eff -= dt*sum([-0.5*op@op+2*np.real(e_op)*op for op, e_op in zip(c_ops, c_expects[0])]) # Euler-Maruyama
-
-    psi_p = sp.sparse.linalg.expm_multiply(H_eff, psi)
+        psi_p = psi + H_eff@psi
 
     if evo_method['nonlinear_corr']:
         c_expects_p = [np.trace(np.outer(np.conj(psi_p), psi_p)@op) for op in c_ops]
@@ -85,17 +87,13 @@ def traj_evo(H:np.array, psi:np.array, dt:float, c_ops:list, evo_method:dict, ra
                         if evo_method['order'] > 3:
                             _comm = X_0@_comm-_comm@X_0
                             H_eff += _comm*dt*dt*dt*c0[i]
+            psi_p = sp.sparse.linalg.expm_multiply(H_eff, psi)
         else:
+            # Euler-Maruyama method
+            H_eff = (-1J*H+sum([-0.5*(np.conj(op).T)@op+0.5*np.conj(e_op+e_op_p)*op for op, e_op, e_op_p in zip(c_ops, c_expects, c_expects_p)]))*dt
             for i in range(k):
                 H_eff += c_ops[i]*np.sqrt(dt)*xis[i]
-            H_eff -= dt*sum([-0.5*op@op+2*np.real(e_op)*op for op, e_op in zip(c_ops, c_expects[0])]) # Euler-Maruyama
-
-        psi_p = sp.sparse.linalg.expm_multiply(H_eff, psi)
-
-    np.set_printoptions(linewidth=1000,precision=2)
-    H_eff = H_eff/10
-    print(sp.sparse.linalg.expm(H_eff)-H_eff)
-    exit()
+            psi_p = psi + H_eff@psi
 
     if evo_method['type'] == 'nonlinear':
         psi_p = psi_p/np.linalg.norm(psi_p)
@@ -116,7 +114,7 @@ def traj_evo_comparison(H:np.array, psis:list, dt:float, c_ops:list, evo_method:
     Returns:
         The wave function of next step.
     """
-    # np.random.seed(rand_seed)
+    np.random.seed(rand_seed)
     p = 1000 # Approximation order
     k = len(c_ops) # Wiener increments number
     R = np.diag([1/(i+1) for i in range(p)])
@@ -245,7 +243,6 @@ def qsdsolve(H:np.array, initial:list, tlist:np.array, c_ops:list, e_ops:list, e
                 var.append(np.real(np.std(_temps)))
 
         e_list.append(expect)
-        print(expect)
         v_list.append(var)
         if i < len(tlist)-1:
         # add parallelization using joblib

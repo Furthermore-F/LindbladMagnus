@@ -48,7 +48,7 @@ parser.add_argument('--system_name', type=str, help='Name of physical/chemical s
 parser.add_argument('--hamiltonian', type=np.array, help='System Hamiltonian.', default=H)
 parser.add_argument('--channels', type=list, help='Operators of damping channels.', default=c_ops)
 parser.add_argument('--magnus_order', type=int, help='Order of Magnus expansion.', default=1)
-parser.add_argument('--types', type=str, help='The type of QSD (linear or nonlinear).', default='Linear')
+parser.add_argument('--types', type=str, help='The type of QSD (linear or nonlinear).', default='Nonlinear')
 parser.add_argument('--observation', type=list, help='The operators that need to be measured.', default=e_ops)
 
 # Circuit Information
@@ -66,6 +66,7 @@ parser.add_argument('--unit_str', type=str, help='The quantum circuits for each 
 # Evolution Information
 parser.add_argument('--method', type=str, help='Method choice of evolution, QSD or QJ.', default='QSD')
 parser.add_argument('--simulator', type=str, help='Name of simulator.', default='statevector')
+parser.add_argument('--noisy_simulation', type=bool, help='Whether or not to add noise.', default=False)
 parser.add_argument('--device', type=str, help='Simulator device.', default='CPU')
 parser.add_argument('--random_seed', type=int, help='Seed of random numbers.', default=42424)
 parser.add_argument('--traj_num', type=int, help='Number of trajectories.', default=1)

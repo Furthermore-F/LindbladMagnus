@@ -2,13 +2,16 @@ from qiskit.circuit import QuantumCircuit, ParameterVector
 from qiskit.circuit import CircuitInstruction, Instruction, Qubit
 from qiskit.circuit import library
 from qiskit import QuantumRegister, transpile
-from qiskit_aer import Aer, AerSimulator, AerError
+from qiskit_aer import Aer, AerSimulator, AerError, noise
+from qiskit_aer.noise import NoiseModel
+from qiskit_ibm_runtime import QiskitRuntimeService, fake_provider
 from qiskit.quantum_info.operators import SparsePauliOp
 from qiskit.quantum_info import commutator, Statevector, Operator
 from argparse import Namespace
 import re
 import matplotlib.pyplot as plt
 import numpy as np
+import mthree
 
 from constants import *
 
@@ -59,6 +62,7 @@ def parse_gate(circuit:QuantumCircuit, command:str, param_vector:ParameterVector
         raise ValueError(f"Not Found: {command}")
 
 def create_circuit_from_string(circ_info:dict):
+    
     circuit = QuantumCircuit(circ_info['qubit_num'], circ_info['bit_num'])
     if circ_info['initialize']:
         circuit.initialize(circ_info['initialize'])
@@ -81,58 +85,27 @@ def initialize_info(args:Namespace) -> tuple[dict, dict, dict]:
     hamil_info['types'] = args.types
     hamil_info['time_interval'] = args.time_interval
 
-    if args.unit_str == 'HVA':
-        # Only for test.
-        hamil_eff = hamil_info['system']
-        sum_channels = 0
-        for i, damp_channel in enumerate(hamil_info['channels']):
-            sum_channels += 1/2*(damp_channel.adjoint()+damp_channel)@damp_channel
-            hamil_eff += damp_channel
-        x = (hamil_eff - sum_channels).simplify()
-        print(x)
-        y = []
-        for i, oo in enumerate(x.paulis):
-            if i != 0 and np.abs(x[i].coeffs) > 1e-3: 
-                y.append(SparsePauliOp([oo]))
-        print(y)
-        qc_HVA = library.hamiltonian_variational_ansatz(y[:-2]).decompose()
-        circ_info['qubit_num'] = args.qubit_num
-        circ_info['initialize'] = Statevector(args.initialize)
-        circ_info['circuit'] = QuantumCircuit(circ_info['qubit_num'])
-        circ_info['circuit'].initialize(circ_info['initialize'])
-        circ_info['circuit'].h(0)
-        circ_info['circuit'].compose(qc_HVA, range(1, args.qubit_num, 1), inplace=True)
-        circ_info['circuit'].h(0)
-        circ_info['param_num'] = circ_info['circuit'].num_parameters
-        circ_info['circuit_template'] = circ_info['circuit'].copy()
-        circ_info['theta_list'] = ParameterVector('θ', length=circ_info['param_num'])
-        circ_info['theta_index'] = np.arange(circ_info['param_num'])
-
-        circ_info['circuit'] = transpile(circ_info['circuit'], optimization_level=1)
-        circ_info['circuit'].draw("mpl", style="iqp")
-        plt.show()
-        
-    elif args.unit_str != 'HVA':
-        circ_info['qubit_num'] = args.qubit_num
-        circ_info['bit_num'] = args.bit_num
-        circ_info['initialize'] = Statevector(args.initialize/np.linalg.norm(args.initialize))
-        circ_info['param_num'] = args.param_num_per_layer*args.layer_number
-        circ_info['theta_list'] = ParameterVector('θ', length=circ_info['param_num'])
-        circ_info['theta_index'] = np.arange(circ_info['param_num'])
-        initial_str = 'H(0);' + args.unit_str*args.layer_number + ' H(0)'
-        circ_info['create_str'] = circ_info['initial_str'] = initial_str.format(*circ_info['theta_index'])
-        circ_info['circuit'] = create_circuit_from_string(circ_info=circ_info)
-        circ_info['circuit_template'] = create_circuit_from_string(circ_info=circ_info)
-
-        circ_info['circuit'] = transpile(circ_info['circuit'], optimization_level=1)
-        circ_info['circuit'].draw("mpl", style="iqp")
-        plt.show()
+    circ_info['qubit_num'] = args.qubit_num
+    circ_info['bit_num'] = args.bit_num
+    circ_info['initialize'] = Statevector(args.initialize/np.linalg.norm(args.initialize))
+    circ_info['param_num'] = args.param_num_per_layer*args.layer_number
+    circ_info['theta_list'] = ParameterVector('θ', length=circ_info['param_num'])
+    circ_info['theta_index'] = np.arange(circ_info['param_num'])
+    initial_str = 'H(0);' + args.unit_str*args.layer_number + ' H(0)'
+    circ_info['create_str'] = circ_info['initial_str'] = initial_str.format(*circ_info['theta_index'])
+    circ_info['circuit'] = create_circuit_from_string(circ_info=circ_info)
+    circ_info['circuit_template'] = create_circuit_from_string(circ_info=circ_info)
+    circ_info['circuit'] = transpile(circ_info['circuit'], optimization_level=1)
 
     evo_info['method'] = args.method
-    evo_info['simulator'] = AerSimulator(method=args.simulator)
+    backend = fake_provider.FakeBelemV2()
+    evo_info['simulator_ideal'] = AerSimulator(method=args.simulator)
+    evo_info['simulator_noise'] = backend
+    evo_info['mitigation'] = mthree.M3Mitigation(backend)
     evo_info['traj_num'] = args.traj_num
     evo_info['time_interval'] = args.time_interval
     evo_info['step_num'] = args.step_num
+    evo_info['noisy_simulation'] = args.noisy_simulation
 
     channel_expects = np.zeros(shape=hamil_info['channels_num']) + 0J
     if hamil_info['types'] == 'Nonlinear':
@@ -200,10 +173,6 @@ def generate_PauliOp(hamil_info:dict) -> SparsePauliOp:
         for i in range(k):
             hamil_eff += hamil_info['channels'][i]*np.sqrt(dt)*xis[i]
         hamil_eff -= dt*sum([-0.5*op@op+2*np.real(e_op)*op for op, e_op in zip(hamil_info['channels'], hamil_info['channel_expects'])]) # Euler-Maruyama
-
-    # np.set_printoptions(linewidth=1000,precision=2)
-    # print(hamil_eff.to_matrix())
-    # exit()
 
     return ((hamil_eff)/(-1J*dt)).simplify().sort()
 

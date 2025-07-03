@@ -8,6 +8,8 @@ from qutip import *
 import time
 from timeit import timeit
 from tqdm import tqdm
+from copy import deepcopy
+from mthree.classes import QuasiDistribution
 
 from utils import *
 from constants import *
@@ -15,7 +17,7 @@ from constants import *
 def measure_M_V(circ_info:dict, hamil_info:dict, simulator:AerSimulator):
 
     gate_num = len(circ_info['circuit'])
-
+    qubits = circ_info['circuit'].qubits
     initial_str = circ_info['initial_str']
     pattern = r"([^\s;]+?)\(p(\d+),(\d+)\)"
     matches = re.finditer(pattern, initial_str)
@@ -37,29 +39,19 @@ def measure_M_V(circ_info:dict, hamil_info:dict, simulator:AerSimulator):
     for i in range(circ_info['param_num']):
 
         gate_index_i = initial_str[:start_index[i]].count(';')+2
-
         circ_info['circuit'].data.insert(gate_index_i, CircuitInstruction(
-            Instruction(f'c{gate_type[i][-1]}'.lower(),2,0,[]), (
-                Qubit(QuantumRegister(circ_info['qubit_num'], 'q'), 0), 
-                Qubit(QuantumRegister(circ_info['qubit_num'], 'q'), qubit_index[i]))
-                ))
-        
-        # circ_info['circuit'].draw("mpl", style="iqp")
-        # plt.show()
+            Instruction(f'c{gate_type[i][-1]}'.lower(),2,0,[]), (qubits[0], qubits[int(qubit_index[i])]))
+            )
 
         for j in range(i+1,circ_info['param_num']):
 
             gate_index_j = initial_str[:start_index[j]].count(';')+3
-    
             circ_info['circuit'].data.insert(gate_index_j, CircuitInstruction(
-                Instruction(f'c{gate_type[j][-1]}'.lower(),2,0,[]), 
-                (Qubit(QuantumRegister(circ_info['qubit_num'], 'q'), 0),
-                 Qubit(QuantumRegister(circ_info['qubit_num'], 'q'), qubit_index[j]))
-                ))
+                Instruction(f'c{gate_type[j][-1]}'.lower(),2,0,[]), (qubits[0], qubits[int(qubit_index[j])]))
+                )
             circ_info['circuit'].data.insert(gate_index_j, CircuitInstruction(
-                Instruction('x', 1, 0, []),
-                (Qubit(QuantumRegister(circ_info['qubit_num'], 'q'), 0),)
-                ))
+                Instruction('x', 1, 0, []), (qubits[0],))
+                )
 
             job_result = simulator.run(circ_info['circuit']).result().get_statevector(circ_info['circuit'])
             job_result = np.diagonal(partial_trace(job_result, list(range(circ_info['qubit_num']))[1:])) 
@@ -82,11 +74,7 @@ def measure_M_V(circ_info:dict, hamil_info:dict, simulator:AerSimulator):
                 job_result = np.diagonal(partial_trace(job_result, list(range(circ_info['qubit_num']))[1:]))
                 re_part = np.abs(job_result[0]) - np.abs(job_result[1])
             if np.abs(np.imag(coeff)) > 1e-9:
-                circ_info['circuit'].data.insert(2, CircuitInstruction(
-                    Instruction('s', 1, 0, []), 
-                    (Qubit(QuantumRegister(circ_info['qubit_num'], 'q'), 0),)
-                    ))
-                
+                circ_info['circuit'].data.insert(2, CircuitInstruction(Instruction('s', 1, 0, []), (qubits[0],)))
                 job_result = simulator.run(circ_info['circuit']).result().get_statevector(circ_info['circuit'])
                 job_result = np.diagonal(partial_trace(job_result, list(range(circ_info['qubit_num']))[1:]))
                 im_part = np.abs(job_result[0]) - np.abs(job_result[1])
@@ -103,10 +91,8 @@ def measure_M_V(circ_info:dict, hamil_info:dict, simulator:AerSimulator):
                     re_part = np.abs(job_result[0]) - np.abs(job_result[1])
                 norm_grad += coeff * re_part
                 circ_info['circuit'].data.insert(gate_index_i, CircuitInstruction(
-                    Instruction(f'c{gate_type[i][-1]}'.lower(),2,0,[]), (
-                        Qubit(QuantumRegister(circ_info['qubit_num'], 'q'), 0), 
-                        Qubit(QuantumRegister(circ_info['qubit_num'], 'q'), qubit_index[i]))
-                        ))
+                    Instruction(f'c{gate_type[i][-1]}'.lower(),2,0,[]), (qubits[0], qubits[int(qubit_index[i])]))
+                    )
             
         del circ_info['circuit'].data[gate_num:-2]
         del circ_info['circuit'].data[gate_index_i]
@@ -123,7 +109,8 @@ def measure_M_V(circ_info:dict, hamil_info:dict, simulator:AerSimulator):
 
 def single_traj_evo(circ_info:dict, evo_info:dict, hamil_info:dict, random_seed:float):
     
-    simulator = evo_info['simulator']
+    simulator_ideal = evo_info['simulator_ideal']
+    simulator_noise = evo_info['simulator_noise']
     hamil_info['random_seed'] = random_seed
 
     hamil_eff = generate_PauliOp(hamil_info=hamil_info)
@@ -137,26 +124,34 @@ def single_traj_evo(circ_info:dict, evo_info:dict, hamil_info:dict, random_seed:
 
         circ_info['circuit'] = circ_info['circuit_template'].copy()
         circ_info['circuit'] = circ_info['circuit'].assign_parameters(circ_info['params'])
-        circ_info['circuit'].save_statevector()
 
         # Measure population
-        job_result = simulator.run(circ_info['circuit']).result().get_statevector(circ_info['circuit'])
-        # circ_info['circuit'].draw("mpl", style="iqp")
-        # plt.show()
-        # print(job_result)
-        job_result = partial_trace(job_result, [0])
-        job_result = np.abs(np.asarray([job_result.expectation_value(op) for op in hamil_info['observation']]))
+        if evo_info['noisy_simulation']:
+            circ_info['circuit'].measure_all()
+            job_result = simulator_noise.run(circ_info['circuit'], shots=524288).result().get_counts()
+            evo_info['mitigation'].cals_from_system(range(3))
+            job_result_mited = evo_info['mitigation'].apply_correction(job_result, range(3))
+            job_result = np.zeros(len(hamil_info['observation']), dtype=complex)
+            for i in range(len(hamil_info['observation'])):
+                for op, coeff in hamil_info['observation'][i].to_list():
+                    job_result[i] += coeff*job_result_mited.expval(op+'I')
+        else:
+            circ_info['circuit'].save_statevector()
+            job_result = simulator_ideal.run(circ_info['circuit']).result().get_statevector(circ_info['circuit'])
+            job_result = partial_trace(job_result, [0])
+            job_result = np.abs(np.asarray([job_result.expectation_value(op) for op in hamil_info['observation']]))
+        
         if hamil_info['types'] == 'Linear':
             job_result = np.abs(job_result*(psi_norm**2))
         results.append(job_result)
-        print(job_result)
-        del circ_info['circuit'].data[-1]
+
+        circ_info['circuit'] = circ_info['circuit_template'].copy()
+        circ_info['circuit'] = circ_info['circuit'].assign_parameters(circ_info['params'])
 
         # Runge-Kutta RK4 Method
 
         # The first point
-        m, v, norm_grad, expect_L_1 = measure_M_V(circ_info, hamil_info, simulator)
-        # m = m + 1e-5*np.identity(circ_info['param_num'])
+        m, v, norm_grad, expect_L_1 = measure_M_V(circ_info, hamil_info, simulator_ideal)
         k_1 = np.dot(np.linalg.pinv(m), v)
         delta_norm_1 = norm_grad * psi_norm
 
@@ -165,7 +160,7 @@ def single_traj_evo(circ_info:dict, evo_info:dict, hamil_info:dict, random_seed:
         circ_info['params'] = {key: circ_info['params'][key]+evo_info['time_interval']*k_1[i]/2 
                                for i, key in enumerate(circ_info['params'])}
         circ_info['circuit'] = circ_info['circuit'].assign_parameters(circ_info['params'])
-        m, v, norm_grad, expect_L_2 = measure_M_V(circ_info, hamil_info, simulator)
+        m, v, norm_grad, expect_L_2 = measure_M_V(circ_info, hamil_info, simulator_ideal)
         # m = m + 1e-5*np.identity(circ_info['param_num'])
         k_2 = np.dot(np.linalg.pinv(m), v)
         delta_norm_2 = norm_grad * (delta_norm_1*evo_info['time_interval']/2 + psi_norm)
@@ -175,8 +170,7 @@ def single_traj_evo(circ_info:dict, evo_info:dict, hamil_info:dict, random_seed:
         circ_info['params'] = {key: circ_info['params'][key]+evo_info['time_interval']*(k_2[i]-k_1[i])/2 
                                for i, key in enumerate(circ_info['params'])}
         circ_info['circuit'] = circ_info['circuit'].assign_parameters(circ_info['params'])
-        m, v, norm_grad, expect_L_3 = measure_M_V(circ_info, hamil_info, simulator)
-        # m = m + 1e-5*np.identity(circ_info['param_num'])
+        m, v, norm_grad, expect_L_3 = measure_M_V(circ_info, hamil_info, simulator_ideal)
         k_3 = np.dot(np.linalg.pinv(m), v)
         delta_norm_3 = norm_grad * (delta_norm_2*evo_info['time_interval']/2 + psi_norm)
 
@@ -185,8 +179,7 @@ def single_traj_evo(circ_info:dict, evo_info:dict, hamil_info:dict, random_seed:
         circ_info['params'] = {key: circ_info['params'][key]+evo_info['time_interval']*(2*k_3[i]-k_2[i])/2 
                                for i, key in enumerate(circ_info['params'])}
         circ_info['circuit'] = circ_info['circuit'].assign_parameters(circ_info['params'])
-        m, v, norm_grad, expect_L_4 = measure_M_V(circ_info, hamil_info, simulator)
-        # m = m + 1e-5*np.identity(circ_info['param_num'])
+        m, v, norm_grad, expect_L_4 = measure_M_V(circ_info, hamil_info, simulator_ideal)
         k_4 = np.dot(np.linalg.pinv(m), v)
         delta_norm_4 = norm_grad * (delta_norm_3*evo_info['time_interval'] + psi_norm)
 
@@ -197,7 +190,7 @@ def single_traj_evo(circ_info:dict, evo_info:dict, hamil_info:dict, random_seed:
         psi_norm += 1/6*evo_info['time_interval']*(delta_norm_1+2*(delta_norm_2+delta_norm_3)+delta_norm_4)
 
         # Update Wiener process
-        hamil_info['random_seed'] = step_index+random_seed+1
+        hamil_info['random_seed'] = step_index + random_seed + 1
         hamil_eff = generate_PauliOp(hamil_info=hamil_info)
         hamil_info['circ_list'], hamil_info['coeff_list'] = generate_circ(hamil_eff, circ_info['qubit_num'])
     

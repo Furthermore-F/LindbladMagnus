@@ -8,14 +8,14 @@ from constants import *
 from qsd_classical import qsdsolve
 
 # Evolution parameters
-step_num = 10
-T = 1e-6
+step_num = 100
+T = 1e-5
 tlist = np.linspace(0.0, T, step_num+1)
-traj_num = 1
+traj_num = 1000
 evo_method = {'period': 42424, 
               'type': 'linear', 
               'nonlinear_corr': False,
-              'comparison': False,
+              'comparison': True,
               'order': 4}
 
 # Model parameters
@@ -68,8 +68,8 @@ ax2.set_xlim([0,T])
 
 # Compare QSD results and Mesolve exact results
 result = mesolve(Qobj(H), Qobj(rho0).unit(), tlist, [Qobj(op) for op in c_ops], [Qobj(op) for op in e_ops])
-# ax1.plot(tlist, result.expect[0], label = 'Exact Singlet')
-# ax1.plot(tlist, result.expect[1], label = 'Exact Triplet')
+ax1.plot(tlist, result.expect[0], label = 'Exact Singlet')
+ax1.plot(tlist, result.expect[1], label = 'Exact Triplet')
 if evo_method['comparison']:
     file_name = f'classical_test/RPM/comparison_{evo_method["type"]}_{traj_num}traj_{step_num}step_{B_0}T_{theta_angle}d'
     initial = [[_psi0]*4]*(traj_num//2) + [[_psi1]*4]*(traj_num//2) # initial wavefunction ensemble
@@ -83,8 +83,7 @@ if evo_method['comparison']:
 else:
     order = evo_method['order']
     file_name = f'classical_test/RPM/{order}order_{evo_method["type"]}_{traj_num}traj_{step_num}step_{B_0}T_{theta_angle}d'
-    # initial = [_psi0]*(traj_num//2) + [_psi1]*(traj_num//2) # initial wavefunction ensemble
-    initial = [_psi0]*traj_num
+    initial = [_psi0]*(traj_num//2) + [_psi1]*(traj_num//2) # initial wavefunction ensemble
     _, e_list = qsdsolve(H, initial, tlist, c_ops, e_ops, evo_method)
     for stat in range(len(e_ops)):
         ax1.plot(tlist, [e_list[i][stat] for i in range(len(tlist))], 

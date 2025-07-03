@@ -4,6 +4,7 @@ import argparse
 import time
 import numpy as np
 import matplotlib.pyplot as plt
+from copy import deepcopy
 
 from qsd_quantum import single_traj_evo
 from utils import *
@@ -41,6 +42,7 @@ parser.add_argument('--unit_str', type=str, help='The quantum circuits for each 
 # Evolution Information
 parser.add_argument('--method', type=str, help='Method choice of evolution, QSD or QJ.', default='QSD')
 parser.add_argument('--simulator', type=str, help='Name of simulator.', default='statevector')
+parser.add_argument('--noisy_simulation', type=bool, help='Whether or not to add noise.', default=False)
 parser.add_argument('--device', type=str, help='Simulator device.', default='CPU')
 parser.add_argument('--random_seed', type=int, help='Seed of random numbers.', default=42424)
 parser.add_argument('--traj_num', type=int, help='Number of trajectories.', default=1)
@@ -51,7 +53,7 @@ parser.add_argument('--parallel', type=int, help='Number of processes in Joblib.
 # Initialize
 args = parser.parse_args()
 hamil_info, circ_info, evo_info = initialize_info(args)
-file_info = f'quantum_test/{args.system_name}/{args.traj_num}traj_{args.step_num}step_{args.types}_{args.magnus_order}order'
+file_info = f'quantum_test/{args.system_name}/(Noisy_{args.noisy_simulation}){args.traj_num}traj_{args.step_num}step_{args.types}_{args.magnus_order}order'
 print_info(args)
 
 fig_evo, ax_evo = plt.subplots()
@@ -63,10 +65,10 @@ exact_results = mesolve(Qobj(H), Qobj(psi0).unit(), times, [Qobj(op) for op in c
 
 # Variational Quantum Simulation 
 t = time.perf_counter()
-results = Parallel(n_jobs=args.parallel, backend="loky")(
-    delayed(single_traj_evo)(circ_info=circ_info, 
-                             evo_info=evo_info, 
-                             hamil_info=hamil_info,
+results = Parallel(n_jobs=args.parallel)(
+    delayed(single_traj_evo)(circ_info=deepcopy(circ_info), 
+                             evo_info=deepcopy(evo_info), 
+                             hamil_info=deepcopy(hamil_info),
                              random_seed=i*args.random_seed) for i in range(evo_info['traj_num'])
     )
 print(f'Total time cost: {time.perf_counter()-t:.4f}')
