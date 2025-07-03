@@ -16,7 +16,7 @@ evo_method = {'period': 42424,
               'type': 'linear', 
               'nonlinear_corr': False,
               'comparison': False,
-              'order':0 # Zero order for EM method
+              'order':1 # Zero order for EM method
               }
 
 # Hamiltonian
