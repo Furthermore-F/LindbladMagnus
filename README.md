@@ -2,7 +2,7 @@
 
 ## QSD_SME_VQA
 
-Building on the close relationship between nonlinearly unraveled Lindblad dynamics, stochastic
+Building on the close relationship between unraveled Lindblad dynamics, stochastic
 Magnus integrators, and variational quantum simulation, we propose a high-order scheme for solving the quantum
 state diffusion equation using exponential integrators. This formulation facilitates the simulation of wavefunction
 trajectories within the established framework of variational quantum algorithms for time evolution. Our
