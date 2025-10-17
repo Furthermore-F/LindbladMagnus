@@ -24,4 +24,4 @@ in terms of the ensemble average.
 
 ## References:
 
-Jia-Cheng Huang, Hao-En Li, Yi-Cheng Wang, Guang-Ze Zhang, Jun Li, Han-Shi Hu, “Towards robust variational quantum simulation of Lindblad dynamics via stochastic Magnus expansion”, [arXiv:2503.22099](https://arxiv.org/abs/2503.22099)
+Jia-Cheng Huang, Hao-En Li, Yi-Cheng Wang, Guang-Ze Zhang, Jun Li, Han-Shi Hu, “Towards robust variational quantum simulation of Lindblad dynamics via stochastic Magnus expansion”, **PRX Quantum** 6, 040312 (2025), [doi](https://journals.aps.org/prxquantum/abstract/10.1103/yyln-q22s)[arXiv:2503.22099](https://arxiv.org/abs/2503.22099)
